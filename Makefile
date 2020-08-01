@@ -38,9 +38,9 @@ push:
 vendor: go.mod
 ifeq ($(VENDOR_DOCKERIZED),1)
 	docker run -it -v $(shell pwd):/src/k8s-cloudwatch-adapter -w /src/k8s-cloudwatch-adapter $(GOIMAGE) /bin/bash -c "\
-		go mod vendor"
+		GOPRIVATE=github.com/bigbasket go mod vendor"
 else
-	go mod vendor
+	GOPRIVATE=github.com/bigbasket go mod vendor
 endif
 
 test:
