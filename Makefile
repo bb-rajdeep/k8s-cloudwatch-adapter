@@ -1,10 +1,10 @@
-REGISTRY?=chankh
-IMAGE?=k8s-cloudwatch-adapter
+# REGISTRY?=chankh
+# IMAGE?=k8s-cloudwatch-adapter
 TEMP_DIR:=$(shell mktemp -d /tmp/$(IMAGE).XXXXXX)
 OUT_DIR?=./_output
 VENDOR_DOCKERIZED?=0
 GIT_HASH?=$(shell git rev-parse --short HEAD)
-VERSION:=$(or ${TRAVIS_TAG},${TRAVIS_TAG},latest)
+# VERSION:=$(or ${TRAVIS_TAG},${TRAVIS_TAG},latest)
 GOIMAGE=golang:1.14
 GOFLAGS=-mod=vendor -tags=netgo
 
