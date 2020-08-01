@@ -14,5 +14,5 @@ require (
 	k8s.io/component-base v0.17.7
 	k8s.io/klog v1.0.0
 	k8s.io/metrics v0.17.7
-	github.com/bigbasket/k8s-custom-hpa/monitoring 13497ee3026e65b3a1024d0d796e1bb3637aba78
+	github.com/bigbasket/k8s-custom-hpa/monitoring v0.7.2
 )
