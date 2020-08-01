@@ -6,6 +6,7 @@ import (
 
 	"github.com/awslabs/k8s-cloudwatch-adapter/pkg/apis/metrics/v1alpha1"
 	informers "github.com/awslabs/k8s-cloudwatch-adapter/pkg/client/informers/externalversions/metrics/v1alpha1"
+	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -19,14 +20,16 @@ type Controller struct {
 	externalMetricSynced cache.InformerSynced
 	enqueuer             func(obj interface{})
 	metricHandler        ControllerHandler
+	visibility           monitoring.Visibility
 }
 
 // NewController returns a new controller for handling external metric types
-func NewController(externalMetricInformer informers.ExternalMetricInformer, metricHandler ControllerHandler) *Controller {
+func NewController(externalMetricInformer informers.ExternalMetricInformer, metricHandler ControllerHandler, visibility monitoring.Visibility) *Controller {
 	controller := &Controller{
 		externalMetricSynced: externalMetricInformer.Informer().HasSynced,
 		metricQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "metrics"),
 		metricHandler:        metricHandler,
+		visibility:           visibility,
 	}
 
 	// wire up enque step.  This provides a hook for testing enqueue step
@@ -83,6 +86,8 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) processNextItem() bool {
+	txn := c.StartTransaction("controllerWorkerProcessItem")
+	defer txn.End()
 	klog.V(2).Info("processing item")
 
 	rawItem, quit := c.metricQueue.Get()
@@ -98,21 +103,27 @@ func (c *Controller) processNextItem() bool {
 	if queueItem, ok = rawItem.(namespacedQueueItem); !ok {
 		// not valid key do not put back on queue
 		c.metricQueue.Forget(rawItem)
-		runtime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", rawItem))
+		err := fmt.Errorf("expected string in workqueue but got %#v", rawItem)
+		txn.RegisterError(err)
+		runtime.HandleError(err)
 		return true
 	}
 
-	err := c.metricHandler.Process(queueItem)
+	err := c.metricHandler.Process(queueItem, txn)
 	if err != nil {
 		retrys := c.metricQueue.NumRequeues(rawItem)
 		if retrys < 5 {
-			klog.Errorf("Transient error with %d retrys for key %s: %s", retrys, rawItem, err)
+			e := fmt.Sprintf("Transient error with %d retrys for key %s: %s", retrys, rawItem, err)
+			klog.Error(e)
+			txn.RegisterError(errors.New(e))
 			c.metricQueue.AddRateLimited(rawItem)
 			return true
 		}
 
 		// something was wrong with the item on queue
-		klog.Errorf("Max retries hit for key %s: %s", rawItem, err)
+		e := fmt.Sprintf("Max retries hit for key %s: %s", rawItem, err)
+		klog.Error(e)
+		txn.RegisterError(errors.New(e))
 		c.metricQueue.Forget(rawItem)
 		runtime.HandleError(err)
 		return true

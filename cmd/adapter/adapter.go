@@ -17,6 +17,7 @@ import (
 	cwprov "github.com/awslabs/k8s-cloudwatch-adapter/pkg/provider"
 	basecmd "github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/cmd"
 	"github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/provider"
+	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 )
 
 // CloudWatchAdapter represents a custom metrics BaseAdapter for Amazon CloudWatch
@@ -29,7 +30,7 @@ func (a *CloudWatchAdapter) makeCloudWatchClient() (aws.Client, error) {
 	return client, nil
 }
 
-func (a *CloudWatchAdapter) newController(metriccache *metriccache.MetricCache) (*controller.Controller, informers.SharedInformerFactory) {
+func (a *CloudWatchAdapter) newController(metriccache *metriccache.MetricCache) (*controller.Controller, informers.SharedInformerFactory, visibility monitoring.Visibility) {
 	clientConfig, err := a.ClientConfig()
 	if err != nil {
 		klog.Fatalf("unable to construct client config: %v", err)
@@ -44,12 +45,14 @@ func (a *CloudWatchAdapter) newController(metriccache *metriccache.MetricCache) 
 		adapterInformerFactory.Metrics().V1alpha1().ExternalMetrics().Lister(),
 		metriccache)
 
-	controller := controller.NewController(adapterInformerFactory.Metrics().V1alpha1().ExternalMetrics(), &handler)
+	
+
+	controller := controller.NewController(adapterInformerFactory.Metrics().V1alpha1().ExternalMetrics(), &handler, visibility)
 
 	return controller, adapterInformerFactory
 }
 
-func (a *CloudWatchAdapter) makeProvider(cwClient aws.Client, metriccache *metriccache.MetricCache) (provider.ExternalMetricsProvider, error) {
+func (a *CloudWatchAdapter) makeProvider(cwClient aws.Client, metriccache *metriccache.MetricCache) (provider.ExternalMetricsProvider, error, visibility monitoring.Visibility) {
 	client, err := a.DynamicClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to construct Kubernetes client")
@@ -60,7 +63,7 @@ func (a *CloudWatchAdapter) makeProvider(cwClient aws.Client, metriccache *metri
 		return nil, errors.Wrap(err, "unable to construct RESTMapper")
 	}
 
-	cwProvider := cwprov.NewCloudWatchProvider(client, mapper, cwClient, metriccache)
+	cwProvider := cwprov.NewCloudWatchProvider(client, mapper, cwClient, metriccache, visibility)
 	return cwProvider, nil
 }
 
@@ -68,6 +71,7 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	visibility := monitoring.NewVisibility()
 	// set up flags
 	cmd := &CloudWatchAdapter{}
 	cmd.Name = "cloudwatch-metrics-adapter"
@@ -80,7 +84,7 @@ func main() {
 	metriccache := metriccache.NewMetricCache()
 
 	// start and run contoller components
-	controller, adapterInformerFactory := cmd.newController(metriccache)
+	controller, adapterInformerFactory := cmd.newController(metriccache, visibility)
 	go adapterInformerFactory.Start(stopCh)
 	go controller.Run(2, time.Second, stopCh)
 
@@ -91,7 +95,7 @@ func main() {
 	}
 
 	// construct the provider
-	cwProvider, err := cmd.makeProvider(cwClient, metriccache)
+	cwProvider, err := cmd.makeProvider(cwClient, metriccache, visibility)
 	if err != nil {
 		klog.Fatalf("unable to construct CloudWatch metrics provider: %v", err)
 	}

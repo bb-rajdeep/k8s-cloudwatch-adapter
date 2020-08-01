@@ -9,6 +9,7 @@ import (
 
 	"github.com/awslabs/k8s-cloudwatch-adapter/pkg/aws"
 	"github.com/awslabs/k8s-cloudwatch-adapter/pkg/metriccache"
+	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 	"github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/provider"
 )
 
@@ -22,16 +23,18 @@ type cloudwatchProvider struct {
 
 	valuesLock  sync.RWMutex
 	metricCache *metriccache.MetricCache
+	visibility  monitoring.Visibility
 }
 
 // NewCloudWatchProvider returns an instance of testingProvider, along with its restful.WebService
 // that opens endpoints to post new fake metrics
-func NewCloudWatchProvider(client dynamic.Interface, mapper apimeta.RESTMapper, cwClient aws.Client, metricCache *metriccache.MetricCache) provider.ExternalMetricsProvider {
+func NewCloudWatchProvider(client dynamic.Interface, mapper apimeta.RESTMapper, cwClient aws.Client, metricCache *metriccache.MetricCache, visibility monitoring.Visibility) provider.ExternalMetricsProvider {
 	provider := &cloudwatchProvider{
 		client:      client,
 		mapper:      mapper,
 		cwClient:    cwClient,
 		metricCache: metricCache,
+		visibility:  visibility,
 	}
 
 	return provider

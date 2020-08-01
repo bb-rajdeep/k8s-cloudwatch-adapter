@@ -15,6 +15,8 @@ func (p *cloudwatchProvider) GetExternalMetric(namespace string, metricSelector 
 	// Note:
 	//		metric name and namespace is used to lookup for the CRD which contains configuration to
 	//		call cloudwatch if not found then ignored and label selector is parsed for all the metrics
+	txn := p.visibility.StartTransaction("GetExternalMetric")
+	defer txn.End()
 	klog.V(0).Infof("Received request for namespace: %s, metric name: %s, metric selectors: %s", namespace, info.Metric, metricSelector.String())
 
 	_, selectable := metricSelector.Requirements()
@@ -54,6 +56,8 @@ func (p *cloudwatchProvider) GetExternalMetric(namespace string, metricSelector 
 }
 
 func (p *cloudwatchProvider) ListAllExternalMetrics() []provider.ExternalMetricInfo {
+	txn := p.visibility.StartTransaction("ListAllExternalMetrics")
+	defer txn.End()
 	p.valuesLock.RLock()
 	defer p.valuesLock.RUnlock()
 

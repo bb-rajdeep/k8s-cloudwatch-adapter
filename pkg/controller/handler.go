@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 )
 
 // Handler processes the events from the controler for external metrics
@@ -35,11 +36,13 @@ type ControllerHandler interface {
 
 // Process validates the item exists then stores updates the metric cached used to make requests to
 // cloudwatch
-func (h *Handler) Process(queueItem namespacedQueueItem) error {
+func (h *Handler) Process(queueItem namespacedQueueItem, txn monitoring.Transaction) error {
 	ns, name, err := cache.SplitMetaNamespaceKey(queueItem.namespaceKey)
 	if err != nil {
 		// not a valid key do not put back on queue
-		runtime.HandleError(fmt.Errorf("expected namespace/name key in workqueue but got %s", queueItem.namespaceKey))
+		e := fmt.Errorf("expected namespace/name key in workqueue but got %s", queueItem.namespaceKey)
+		txn.RegisterError(e)
+		runtime.HandleError(e)
 		return err
 	}
 
