@@ -8,11 +8,11 @@ import (
 	listers "github.com/awslabs/k8s-cloudwatch-adapter/pkg/client/listers/metrics/v1alpha1"
 	"github.com/awslabs/k8s-cloudwatch-adapter/pkg/metriccache"
 
+	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	"github.com/bigbasket/k8s-custom-hpa/monitoring"
 )
 
 // Handler processes the events from the controler for external metrics
